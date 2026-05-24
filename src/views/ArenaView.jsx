@@ -1,5 +1,5 @@
 import React from 'react';
-import { TRACKS } from '../constants/data';
+import { supabase } from '../supabaseClient';
 
 // ==========================================
 // VISTA 1: CREAR UN EVENTO ARENA (EMPRESAS)
@@ -13,27 +13,50 @@ export function CreateArenaView({
   setCurrentView,
   setCurrentTab
 }) {
-  const handleCreateArenaEvent = (e) => {
-    e.preventDefault();
-    const event = {
-      id: Date.now(),
-      ...newArenaEvent,
-      company: user.name
-    };
-    setArenaEvents([event, ...arenaEvents]);
-    setNewArenaEvent({ title: '', tracks: [], date: '', description: '', teamMode: 'both' });
-    setCurrentView('dashboard');
-    setCurrentTab('arena');
-    alert("Mini-Hackathon programada exitosamente.");
-  };
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleArenaTrackChange = (track) => {
-    if (newArenaEvent.tracks.includes(track)) {
-      setNewArenaEvent({ ...newArenaEvent, tracks: newArenaEvent.tracks.filter(t => t !== track) });
-    } else {
-      setNewArenaEvent({ ...newArenaEvent, tracks: [...newArenaEvent.tracks, track] });
+  const handleCreateArenaEvent = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      console.log('Creating arena event with data:', newArenaEvent);
+      console.log('User:', user);
+
+      const { data, error } = await supabase
+        .from('arena_events')
+        .insert([{
+          title: newArenaEvent.title,
+          description: newArenaEvent.description,
+          start_date: newArenaEvent.date,
+          end_date: newArenaEvent.date, // Usar la misma fecha por ahora
+          team_mode: newArenaEvent.teamMode,
+          status: 'active',
+          organization_id: user.id,
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating arena event:', error);
+        throw error;
+      }
+
+      console.log('Arena event created successfully:', data);
+
+      setArenaEvents([data, ...arenaEvents]);
+      setNewArenaEvent({ title: '', date: '', description: '', teamMode: 'both' });
+      setCurrentView('dashboard');
+      setCurrentTab('arena');
+      alert("Mini-Hackathon programada exitosamente.");
+    } catch (err) {
+      console.error('Error al crear evento:', err);
+      alert('Error al crear el evento: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-8 rounded-xl border border-gray-200 dark:border-gray-800 shadow-none">
@@ -44,18 +67,6 @@ export function CreateArenaView({
       
       <form onSubmit={handleCreateArenaEvent} className="space-y-4">
         <input type="text" placeholder="Título del Evento (Ej. Datathon Finanzas 2026)" value={newArenaEvent.title} onChange={(e)=>setNewArenaEvent({...newArenaEvent, title: e.target.value})} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 outline-none" required />
-        
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-          <label className="block text-sm font-medium text-gray-950 dark:text-gray-50 mb-2">Tracks Involucrados (Multidisciplinario)</label>
-          <div className="flex flex-wrap gap-2">
-            {TRACKS.map(track => (
-              <label key={track} className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 cursor-pointer hover:border-blue-500 dark:hover:border-blue-600">
-                <input type="checkbox" checked={newArenaEvent.tracks.includes(track)} onChange={() => handleArenaTrackChange(track)} className="rounded text-blue-600 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600" />
-                <span className="text-sm text-gray-900 dark:text-gray-100">{track}</span>
-              </label>
-            ))}
-          </div>
-        </div>
 
         <textarea placeholder="Descripción del escenario o crisis..." value={newArenaEvent.description} onChange={(e)=>setNewArenaEvent({...newArenaEvent, description: e.target.value})} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 outline-none" rows="4" required />
         
@@ -74,7 +85,9 @@ export function CreateArenaView({
           </div>
         </div>
 
-        <button type="submit" className="w-full bg-blue-950 dark:bg-blue-900 text-white px-6 py-4 rounded-lg font-bold hover:bg-blue-900 dark:hover:bg-blue-800 transition shadow-none mt-4 text-lg">Lanzar a la Arena</button>
+        <button type="submit" disabled={isSubmitting} className={`w-full bg-blue-950 dark:bg-blue-900 text-white px-6 py-4 rounded-lg font-bold hover:bg-blue-900 dark:hover:bg-blue-800 transition shadow-none mt-4 text-lg ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}>
+          {isSubmitting ? 'Publicando...' : 'Lanzar a la Arena'}
+        </button>
       </form>
     </div>
   );
